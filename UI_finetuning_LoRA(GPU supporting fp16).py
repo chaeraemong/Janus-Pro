@@ -1,11 +1,4 @@
-import os
-import random
-from typing import List, Tuple, Dict, Any
-import numpy as np
-import torch
-from peft import LoraConfig, get_peft_model
-from torch.optim import AdamW
-from multimodal_trainer import EnhancedMultiModalTrainer
+from utils.multimodal_trainer_fp16 import EnhancedMultiModalTrainer
 
 system_message = """You are a GUI agent.
 I will give you a screenshot of a mobile phone.
