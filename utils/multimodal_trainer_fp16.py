@@ -149,9 +149,21 @@ class EnhancedMultiModalTrainer:
                 entries = data if isinstance(data, list) else [data]
                 for ann in entries:
                     img_rel = ann["image_path"]                     # ann["image_path"] format : "general/...png"
-                    prefix  = "general" + os.sep
-                    if img_rel.startswith(prefix):                  # remove redundant prefix(general) if present
-                        img_rel = img_rel[len(prefix):]
+                    prefix1  = "general" + os.sep
+                    prefix2  = "google_apps" + os.sep
+                    prefix3  = "install" + os.sep
+                    prefix4  = "single" + os.sep
+                    prefix5  = "web_shopping" + os.sep
+                    if img_rel.startswith(prefix1):                 # remove redundant prefix(general) if present
+                        img_rel = img_rel[len(prefix1):]
+                    elif img_rel.startswith(prefix2):
+                        img_rel = img_rel[len(prefix2):]
+                    elif img_rel.startswith(prefix3):
+                        img_rel = img_rel[len(prefix3):]
+                    elif img_rel.startswith(prefix4):
+                        img_rel = img_rel[len(prefix4):]
+                    elif img_rel.startswith(prefix5):
+                        img_rel = img_rel[len(prefix5):]
                     img_path = os.path.join(self.data_dir, img_rel)
                     self.samples.append((img_path, ann))
         pairs = []
