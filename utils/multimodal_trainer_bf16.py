@@ -1,5 +1,3 @@
-# multimodal_trainer.py
-
 import os, json
 from typing import List, Tuple, Dict, Any
 import torch
