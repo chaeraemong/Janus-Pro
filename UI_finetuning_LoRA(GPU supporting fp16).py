@@ -22,15 +22,15 @@ I will give you a screenshot of a mobile phone.
 trainer = EnhancedMultiModalTrainer(
     data_dir="./data/android_in_the_zoo/train/general",
     pretrained_model_path="deepseek-ai/Janus-Pro-1B",
-    output_dir="./janus_lora2",
+    output_dir="./janus_lora",
     batch_size=2,
     max_epochs=10,
     lr=3e-4,
     user_question=system_message,
     optimizer_name="AdamW",
     lora_config={
-        "r": 32,
-        "lora_alpha": 64,
+        "r": 16,
+        "lora_alpha": 32,
         "target_modules": [
             # vision_model
             "vision_model.vision_tower.patch_embed.proj",
@@ -59,8 +59,8 @@ trainer = EnhancedMultiModalTrainer(
             "vl_gpt.language_model.model.layers.*.mlp.down_proj",
             "language_model.lm_head",
         ],
-        "lora_dropout": 0.05,
-        "bias": "all",
+        "lora_dropout": 0.1,
+        "bias": "none",
         "task_type": "CAUSAL_LM",
     },
     training_args={
@@ -69,7 +69,7 @@ trainer = EnhancedMultiModalTrainer(
         "save_strategy": "epoch",
         "evaluation_strategy": "no",
         "logging_steps": 50,
-        "save_total_limit": 5,
+        "save_total_limit": 2,
         "remove_unused_columns": False,
     }
 )
