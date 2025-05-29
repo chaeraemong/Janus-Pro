@@ -33,20 +33,18 @@ class EnhancedMultiModalModel(MultiModalityCausalLM):
         **kwargs,
     ):
         """
-        이미지와 텍스트의 결합 처리를 지원.
+        Forward method supporting joint image-text processing.
         """
-        # 이미지 입력과 마스크가 제공되면 멀티모달 입력을 처리
-        if pixel_values is not None and image_token_masks is not None:
+        if pixel_values is not None and image_token_masks is not None:  # support both image inputs and masks
             inputs_embeds = self._process_multimodal_inputs(
                 input_ids=input_ids,
                 pixel_values=pixel_values,
                 image_token_masks=image_token_masks,
             )
-        else:
-            # 텍스트 임베딩만 사용하는 경우
+        else:                                                           # otherwise, use text embeddings only
             inputs_embeds = self.language_model.get_input_embeddings()(input_ids)
 
-        # 이미 생성된 inputs_embeds를 사용
+        # Utilize already generated inputs_embeds
         kwargs.pop("inputs_embeds", None)
         outputs = self.language_model(
             input_ids=None,
@@ -64,7 +62,7 @@ class EnhancedMultiModalModel(MultiModalityCausalLM):
         image_token_masks: torch.BoolTensor,
     ) -> torch.Tensor:
         """
-        이미지 토큰과 텍스트 토큰을 결합한 임베딩을 생성.
+        Generate combined embeddings from image and text tokens.
 
         Args:
             input_ids (torch.LongTensor): [batch_size, seq_length]
@@ -75,17 +73,17 @@ class EnhancedMultiModalModel(MultiModalityCausalLM):
             torch.Tensor: 결합된 토큰 임베딩 [batch_size, seq_length, hidden_dim]
         """
         bs, n = pixel_values.shape[0:2]
-        images = pixel_values.view(bs * n, *pixel_values.shape[2:])
-        image_features = self.vision_model(images)                  # 비전 모델을 통해 이미지 특징 추출
-        aligned_features = self.aligner(image_features)             # alignment model 적용
+        images = pixel_values.view(bs * n, *pixel_values.shape[2:]) # flatten batch and image dimensions for vision model
+        image_features = self.vision_model(images)                  # extract image features through vision model
+        aligned_features = self.aligner(image_features)             # utilize alignment model
 
         aligned_features = aligned_features.view(bs, n, *aligned_features.shape[1:])    # [batch_size, num_images, token_length, hidden]
-        aligned_features = aligned_features.flatten(1, 2)           # 이미지 토큰 차원 합치기
+        aligned_features = aligned_features.flatten(1, 2)           # merge image tokens
 
-        text_embeds = self.language_model.get_input_embeddings()(input_ids)             # 텍스트 임베딩 생성
+        text_embeds = self.language_model.get_input_embeddings()(input_ids)             # get text embeddings
 
         for i in range(bs):
-            num_image_tokens = image_token_masks[i].sum().item()    # 마스크된 위치에 이미지 임베딩 삽입
+            num_image_tokens = image_token_masks[i].sum().item()    # insert aligned image embeddings into text embeddings
             num_aligned_tokens = aligned_features[i].shape[0]
             if num_image_tokens != num_aligned_tokens:
                 raise ValueError(
@@ -139,24 +137,20 @@ class EnhancedMultiModalTrainer:
 
     def _load_data(self) -> List[Tuple[str, str]]:                  # load text-image pair
         self.samples = []
-        # 1) 에피소드 폴더 목록을 가져오고
-        episode_dirs = [
+        episode_dirs = [                                            # list episode directories
             os.path.join(self.data_dir, d)
             for d in os.listdir(self.data_dir)
             if os.path.isdir(os.path.join(self.data_dir, d))
         ]
-        # 2) 각 폴더 안의 모든 .json 파일을 읽어서
-        for ep in episode_dirs:
+        for ep in episode_dirs:                                     # read each JSON file in episode folders
             for jp in glob(os.path.join(ep, "*.json")):
                 with open(jp, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                # JSON이 리스트라면 각 원소, 아니면 하나의 dict
                 entries = data if isinstance(data, list) else [data]
                 for ann in entries:
-                    # ann["image_path"]는 "general/...png" 형태라고 가정
-                    img_rel = ann["image_path"]
+                    img_rel = ann["image_path"]                     # ann["image_path"] format : "general/...png"
                     prefix  = "general" + os.sep
-                    if img_rel.startswith(prefix):
+                    if img_rel.startswith(prefix):                  # remove redundant prefix(general) if present
                         img_rel = img_rel[len(prefix):]
                     img_path = os.path.join(self.data_dir, img_rel)
                     self.samples.append((img_path, ann))
@@ -164,7 +158,6 @@ class EnhancedMultiModalTrainer:
         for i in range(self.__len__()):
             image_path, inst, screen_desc, action = self.__getitem__(i)
             pairs.append((image_path, inst, screen_desc, action))
-
         return pairs
     
     def __len__(self):
@@ -205,7 +198,7 @@ class EnhancedMultiModalTrainer:
 
     def _prepare_model(self):
         """
-        사전학습 모델을 로드하고 LoRA 파인튜닝 설정을 수행.
+        Load pretrained model and set up LoRA fine-tuning.
         """
         print(f"Loading pretrained model from {self.pretrained_model_path}")
         self.processor = VLChatProcessor.from_pretrained(
@@ -218,7 +211,7 @@ class EnhancedMultiModalTrainer:
             device_map="auto"
         )
 
-        # 配置 LoRA
+        # LoRA
         lora_config = LoraConfig(**self.lora_config)
         self.model = get_peft_model(self.model, lora_config)
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
@@ -227,7 +220,7 @@ class EnhancedMultiModalTrainer:
 
     def _prepare_optimizer_and_scheduler(self, dataset_size: int):
         """"
-        옵티마이저 및 학습률 스케줄러를 준비.
+        Prepare optimizer and learning rate scheduler.
         """
         if self.optimizer_name == "AdamW":
             optimizer = AdamW(self.model.parameters(), lr=self.lr, weight_decay=0.01)
@@ -254,7 +247,7 @@ class EnhancedMultiModalTrainer:
 
     def _collate_fn(self, batch: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         """
-        사용자 정의 데이터 콜레이트 함수.
+        Custom data collate function.
         """
         conversations = []
         for item in batch:
@@ -281,7 +274,7 @@ class EnhancedMultiModalTrainer:
 
     def _generate_conversation(self, image_path: str, instruction: str, screen_description: str, action: str) -> List[Dict[str, Any]]:
         """
-        대화 템플릿을 생성.
+        Generate conversation template for each sample.
         """
         return [
             {"role": "<|User|>", "content": f"<image_placeholder>\n{system_message.format(instruction=instruction, screen_desc=screen_description)}", "images": [image_path]},
@@ -290,7 +283,7 @@ class EnhancedMultiModalTrainer:
 
     def train(self):
         """
-        메인 학습 흐름.
+        Main training flow.
         """
         pairs = self._load_data()
         dataset = [{"image_path": img, "instruction": inst, "screen_description": desc, "action": act} for img, inst, desc, act in pairs]
