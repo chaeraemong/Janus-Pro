@@ -1,6 +1,12 @@
 from utils.multimodal_trainer_fp16 import EnhancedMultiModalTrainer
 
-system_message = """You are a GUI agent.
+system_desc_message = """You are a GUI agent.
+I will give you a screenshot of a mobile phone.
+**INSTRUCTION**: {instruction}
+
+**TASK**: Given the screenshot and instruction, you should analyze the screen for relevant details that might pertain to the given query. This includes checking for specific applications, icons, or buttons that are visible, and any information or results that are currently displayed on the screen.
+"""
+system_act_message = """You are a GUI agent.
 I will give you a screenshot of a mobile phone.
 **INSTRUCTION**: {instruction}
 **SCREEN DESCRIPTION**: {screen_desc}
@@ -8,8 +14,8 @@ I will give you a screenshot of a mobile phone.
 **SCREEN COORDINATE SYSTEM**: A coordinate (x, y) represents a point on the screen. The first value, labeled as `x`, horizontal,i.e. x ranges from 0 to 1, meaning the position of point ranges from the left to right, where x<0.4 means left, 0.4<=x<=0.6 means middle and x>0.6 meansright. The second value, labeled as `y`, is vertical, i.e. y ranges from 0 to 1, meaning the position of point ranges from the bottom to top. where y<0.2means bottom, 0.2<=y<0.4 means lower, + 0.4<=y<0.5 means lower middle, 0.5<=y<=0.6 means upper middle, 0.6<y<=0.8 means upper, and y>0.8 means top. 
 **TASK**: Given the screenshot and instruction, follow the bellow tasks to fulfill the instruction.
 1. You should analyze the screen for relevant details that might pertain to the given query. This includes checking for specific applications, icons, or buttons that are visible, and any information or results that are currently displayed on the screen. The screen analysis should be like the **SCREEN DESCRIPTION** part.
-2. After screen description through screen analysis, describe possible actions you may conduct. You must answer by two sentences with the format: 'Think: ... Possible actions are ...'.
-3. Based on the possible actions conductable, you have to perform a final action on screen.
+2. After screen description through screen analysis, describe possible actions you may conduct.
+3. Based on the possible actions conductable, you have to perform a final action on screen. You must answer by the following format: 'Action: result_action_type: ...,\nresult_action_text: ...,\nresult_touch_yx: ...,\nresult_lift_yx: ....'.
 """
 
 trainer = EnhancedMultiModalTrainer(
@@ -19,7 +25,7 @@ trainer = EnhancedMultiModalTrainer(
     batch_size=2,
     max_epochs=10,
     lr=3e-4,
-    user_question=system_message,
+    user_question=system_act_message,
     optimizer_name="AdamW",
     lora_config={
         "r": 16,
