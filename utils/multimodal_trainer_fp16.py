@@ -9,7 +9,13 @@ from models import MultiModalityCausalLM, VLChatProcessor
 from utils.io import load_pil_images
 
 
-system_message = """You are a GUI agent.
+system_desc_message = """You are a GUI agent.
+I will give you a screenshot of a mobile phone.
+**INSTRUCTION**: {instruction}
+
+**TASK**: Given the screenshot and instruction, you should analyze the screen for relevant details that might pertain to the given query. This includes checking for specific applications, icons, or buttons that are visible, and any information or results that are currently displayed on the screen.
+"""
+system_act_message = """You are a GUI agent.
 I will give you a screenshot of a mobile phone.
 **INSTRUCTION**: {instruction}
 **SCREEN DESCRIPTION**: {screen_desc}
@@ -17,8 +23,8 @@ I will give you a screenshot of a mobile phone.
 **SCREEN COORDINATE SYSTEM**: A coordinate (x, y) represents a point on the screen. The first value, labeled as `x`, horizontal,i.e. x ranges from 0 to 1, meaning the position of point ranges from the left to right, where x<0.4 means left, 0.4<=x<=0.6 means middle and x>0.6 meansright. The second value, labeled as `y`, is vertical, i.e. y ranges from 0 to 1, meaning the position of point ranges from the bottom to top. where y<0.2means bottom, 0.2<=y<0.4 means lower, + 0.4<=y<0.5 means lower middle, 0.5<=y<=0.6 means upper middle, 0.6<y<=0.8 means upper, and y>0.8 means top. 
 **TASK**: Given the screenshot and instruction, follow the bellow tasks to fulfill the instruction.
 1. You should analyze the screen for relevant details that might pertain to the given query. This includes checking for specific applications, icons, or buttons that are visible, and any information or results that are currently displayed on the screen. The screen analysis should be like the **SCREEN DESCRIPTION** part.
-2. After screen description through screen analysis, describe possible actions you may conduct. You must answer by two sentences with the format: 'Think: ... Possible actions are ...'.
-3. Based on the possible actions conductable, you have to perform a final action on screen.
+2. After screen description through screen analysis, describe possible actions you may conduct.
+3. Based on the possible actions conductable, you have to perform a final action on screen. You must answer by the following format: 'Action: result_action_type: ...,\nresult_action_text: ...,\nresult_touch_yx: ...,\nresult_lift_yx: ....'.
 """
 
 
@@ -198,8 +204,8 @@ class EnhancedMultiModalTrainer:
         elif ann.get("result_action_type", "") == 10:
             act_type = "completed"
 
-        instruction=ann.get("instruction", ""),
-        screen_desc=ann.get("coat_screen_desc", ""),
+        instruction=ann.get("instruction", "")
+        screen_desc=ann.get("coat_screen_desc", "")
         correct_next_action = (
             f"result_action_type: {act_type}\n"
             f"result_action_text: {ann.get('result_action_text','')}\n"
@@ -288,11 +294,17 @@ class EnhancedMultiModalTrainer:
         """
         Generate conversation template for each sample.
         """
-        return [
-            {"role": "<|User|>", "content": f"<image_placeholder>\n{system_message.format(instruction=instruction, screen_desc=screen_description)}", "images": [image_path]},
+        description_conversation = [
+            {"role": "<|User|>", "content": f"<image_placeholder>\n{system_desc_message.format(instruction=instruction)}", "images": [image_path]},
+            {"role": "<|Assistant|>", "content": screen_description},
+        ]
+        action_conversation =  [
+            {"role": "<|User|>", "content": f"<image_placeholder>\n{system_act_message.format(instruction=instruction, screen_desc=screen_description)}", "images": [image_path]},
             {"role": "<|Assistant|>", "content": action},
         ]
-
+        # print("conversation : ", conversation)
+        return action_conversation
+        
     def train(self):
         """
         Main training flow.
